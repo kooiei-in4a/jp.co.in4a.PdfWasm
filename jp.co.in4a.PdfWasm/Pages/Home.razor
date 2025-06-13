@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
+@using Syncfusion.Pdf.Security
 @using jp.co.in4a.PdfWasm.PdfUtils
 @inject IJSRuntime JSRuntime
 
@@ -305,22 +306,26 @@
             var buffer = new byte[selectedFile.Size];
             await stream.ReadAsync(buffer);
             
-            
+            //PdfPermissionsFlags permissions
+
             try
             {
+
+                PdfPermissionsFlags permissions　= PdfPermissionsFlags.Default;
+                var encrptBuffer = PdfSecurityManager.ApplySecurity(buffer, userPassword, ownerPassword, permissions);
                 //var encrptBuffer = PasswordSetter.SetPdfPassword(buffer, userPassword, ownerPassword);
-                var encrptBuffer = new byte[0]; // 仮の実装
+                //var encrptBuffer = new byte[0]; // 仮の実装
    
                 
-                // 実際の実装では上記で生成されたprotectedPdfを使用
-                var protectedPdf = encrptBuffer; // 仮の実装
+                // // 実際の実装では上記で生成されたprotectedPdfを使用
+                // var protectedPdf = encrptBuffer; // 仮の実装
                 
-                // ダウンロード用のファイル名を生成
-                var originalFileName = Path.GetFileNameWithoutExtension(selectedFile.Name);
-                var downloadFileName = $"{originalFileName}_protected.pdf";
+                // // ダウンロード用のファイル名を生成
+                // var originalFileName = Path.GetFileNameWithoutExtension(selectedFile.Name);
+                // var downloadFileName = $"{originalFileName}_protected.pdf";
                 
                 // ブラウザでファイルダウンロードを実行
-                await DownloadFile(protectedPdf, downloadFileName);
+                await DownloadFile(encrptBuffer, DateTime.Now.ToString("yyyyMMdd_HHmmss_") + selectedFile.Name);
                 
                 // 成功メッセージを表示
                 successMessage = "パスワードの設定が完了し、ファイルがダウンロードされました。";
