@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using Microsoft.AspNetCore.Components.Forms
 @using MudBlazor
+@using jp.co.in4a.PdfWasm.PdfUtils
 @inject IJSRuntime JSRuntime
 
 <PageTitle>PDFパスワード設定</PageTitle>
@@ -249,18 +250,13 @@
             var buffer = new byte[selectedFile.Size];
             await stream.ReadAsync(buffer);
 
-            // 既存のPdfSharpCoreラップクラスを使用してパスワード確認
-            //PdfSecurityInfo pdfSecurityInfo = Utils.IsPasswordProtected(buffer,"");
-
+            var result = PdfPasswordChecker.CheckPasswordProtection(buffer,"");
 
             // 既存パスワードチェック結果（実際の実装では上記のラップクラスの結果を使用）
-            // bool hasUserPassword = pdfSecurityInfo.isViewingPasswordProtected;
-            // bool hasOwnerPassword = pdfSecurityInfo.isPermissionPasswordProtected;
-
-            // 既存パスワードチェック結果（実際の実装では上記のラップクラスの結果を使用）
-            bool hasUserPassword = true; // 仮の実装
-            bool hasOwnerPassword = true; // 仮の実装
+            bool hasUserPassword = result.HasUserPassword; // 仮の実装
+            bool hasOwnerPassword = result.HasOwnerPassword; // 仮の実装
             
+            Console.WriteLine($"PDFファイルのパスワードチェック結果: ユーザーパスワード={hasUserPassword}, オーナーパスワード={hasOwnerPassword}");
             
             if (hasUserPassword || hasOwnerPassword)
             {
