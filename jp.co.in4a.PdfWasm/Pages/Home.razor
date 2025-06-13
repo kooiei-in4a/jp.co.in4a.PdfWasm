@@ -1,7 +1,409 @@
 ﻿@page "/"
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@inject IJSRuntime JSRuntime
 
-<PageTitle>Home</PageTitle>
+<PageTitle>PDFパスワード設定</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-4">
+    <!-- ページタイトル -->
+    <MudText Typo="Typo.h4" Class="mb-4">PDFパスワード設定</MudText>
+    
+    <!-- メインコンテンツカード -->
+    <MudCard>
+        <MudCardContent>
+            <!-- ファイルアップロードセクション -->
+            <MudGrid>
+                <MudItem xs="12">
+                    <MudText Typo="Typo.h6" Class="mb-3">1. PDFファイルを選択してください</MudText>
+                    <MudFileUpload T="IBrowserFile" 
+                        MaximumFileCount="1" 
+                        FilesChanged="OnFileSelected"
+                        MaxFileSize="@MaxSizeByte"
+                        Accept=".pdf"
+                        Class="mb-3">
+                    <ActivatorContent>
+                        <MudButton Variant="Variant.Filled"
+                                   Color="Color.Primary"
+                                   StartIcon="@Icons.Material.Filled.CloudUpload">
+                            PDFファイルを選択
+                        </MudButton>
+                    </ActivatorContent>
+                </MudFileUpload>
 
-Welcome to your new app.
+                @if (selectedFile != null)
+                {
+                    <MudText Class="mt-2">
+                        <MudIcon Icon="@Icons.Material.Filled.InsertDriveFile" Size="Size.Small" />
+                        <MudChip T="string" Color="Color.Info" Text="@selectedFile.Name" />
+                        <MudText Typo="Typo.body2" Class="ml-2">
+                            サイズ: @FormatFileSize(selectedFile.Size)
+                        </MudText>
+                    </MudText>
+                }
+                    
+                    <!-- ファイル選択時の制限事項表示 -->
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        ※ PDFファイルのみ、10MB以下のファイルを選択してください
+                    </MudText>
+                </MudItem>
+            </MudGrid>
+
+            <!-- 処理中表示 -->
+            @if (isProcessing)
+            {
+                <MudGrid Class="mt-4">
+                    <MudItem xs="12" Class="text-center">
+                        <MudProgressCircular Indeterminate="true" />
+                        <MudText Typo="Typo.body1" Class="mt-2">
+                            @processingMessage
+                        </MudText>
+                    </MudItem>
+                </MudGrid>
+            }
+
+            <!-- エラーメッセージ表示 -->
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-4">
+                    @errorMessage
+                </MudAlert>
+            }
+
+            <!-- パスワード設定フォーム -->
+            @if (showPasswordForm)
+            {
+                <MudDivider Class="my-4" />
+                
+                <MudGrid>
+                    <MudItem xs="12">
+                        <MudText Typo="Typo.h6" Class="mb-3">2. パスワードを設定してください</MudText>
+                        
+                        <!-- パスワード設定フォーム -->
+                        <MudForm @ref="passwordForm" @bind-IsValid="@isFormValid">
+                            <MudGrid>
+                                <!-- 閲覧パスワード入力 -->
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="userPassword"
+                                                  Label="閲覧パスワード"
+                                                  Variant="Variant.Outlined"
+                                                  InputType="InputType.Password"
+                                                  HelperText="PDFを開く際に必要なパスワード（任意）"
+                                                  Class="mb-3" />
+                                </MudItem>
+                                
+                                <!-- 編集パスワード入力 -->
+                                <MudItem xs="12" md="6">
+                                    <MudTextField @bind-Value="ownerPassword"
+                                                  Label="編集パスワード"
+                                                  Variant="Variant.Outlined"
+                                                  InputType="InputType.Password"
+                                                  HelperText="PDF編集時に必要なパスワード（任意）"
+                                                  Class="mb-3" />
+                                </MudItem>
+                                
+                                <!-- パスワード設定に関する注意事項 -->
+                                <MudItem xs="12">
+                                    <MudAlert Severity="Severity.Info" Class="mb-3">
+                                        <MudText Typo="Typo.body2">
+                                            ・閲覧パスワード、編集パスワードのどちらか一方のみでも設定可能です<br/>
+                                            ・両方とも空欄の場合は処理できません
+                                        </MudText>
+                                    </MudAlert>
+                                </MudItem>
+                                
+                                <!-- パスワード設定実行ボタン -->
+                                <MudItem xs="12" Class="text-center">
+                                    <MudButton Variant="Variant.Filled"
+                                               Color="Color.Success"
+                                               Size="Size.Large"
+                                               StartIcon="@Icons.Material.Filled.Lock"
+                                               OnClick="SetPasswordAndDownload"
+                                               Disabled="@(!CanSetPassword() || isProcessing)">
+                                        パスワードを設定してダウンロード
+                                    </MudButton>
+                                </MudItem>
+                            </MudGrid>
+                        </MudForm>
+                    </MudItem>
+                </MudGrid>
+            }
+
+            <!-- 成功メッセージ表示 -->
+            @if (!string.IsNullOrEmpty(successMessage))
+            {
+                <MudAlert Severity="Severity.Success" Class="mt-4">
+                    @successMessage
+                </MudAlert>
+            }
+        </MudCardContent>
+    </MudCard>
+    
+    <!-- 使用方法説明 -->
+    <MudCard Class="mt-4">
+        <MudCardContent>
+            <MudText Typo="Typo.h6" Class="mb-3">使用方法</MudText>
+
+            <MudList T="string">
+                <MudListItem Icon="@Icons.Material.Filled.FileUpload">
+                    PDFファイル（10MB以下）を選択してください
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Security">
+                    既にパスワードが設定されているPDFは処理できません
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Lock">
+                    閲覧用・編集用パスワードを個別に設定できます
+                </MudListItem>
+                <MudListItem Icon="@Icons.Material.Filled.Download">
+                    設定完了後、パスワード付きPDFがダウンロードされます
+                </MudListItem>
+            </MudList>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private const long MaxSizeByte = 10485760;
+
+    // ファイル関連のプロパティ
+    private IBrowserFile? selectedFile;
+    private string selectedFileName = "";
+
+    // パスワード関連のプロパティ
+    private string userPassword = string.Empty;      // 閲覧パスワード
+    private string ownerPassword = string.Empty;     // 編集パスワード
+
+    // UI状態管理のプロパティ
+    private bool isProcessing = false;               // 処理中フラグ
+    private bool showPasswordForm = false;           // パスワードフォーム表示フラグ
+    private bool isFormValid = false;                // フォームバリデーション結果
+    private string processingMessage = string.Empty; // 処理中メッセージ
+    private string errorMessage = string.Empty;      // エラーメッセージ
+    private string successMessage = string.Empty;    // 成功メッセージ
+
+    // フォーム参照
+    private MudForm? passwordForm;
+
+    /// <summary>
+    /// ファイル選択時の処理
+    /// </summary>
+    /// <param name="files">選択されたファイル</param>
+    private async Task OnFileSelected(IBrowserFile file)
+    {
+        try
+        {
+            // 前回の状態をクリア
+            ClearMessages();
+            showPasswordForm = false;
+
+            // ファイルが選択されていない場合は処理終了
+            //var file = files.
+            if (file == null)
+            {
+                selectedFile = null;
+                return;
+            }
+
+            // ファイルサイズチェック（1MB = 1,048,576 bytes）
+            if (file.Size > MaxSizeByte)
+            {
+                errorMessage = "ファイルサイズが10MBを超えています。10MB以下のファイルを選択してください。";
+                return;
+            }
+
+            // PDFファイル形式チェック
+            if (!file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) &&
+                !file.Name.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                errorMessage = "PDFファイルを選択してください。";
+                return;
+            }
+
+            selectedFile = file;
+
+            // 既存パスワードチェック処理を開始
+            await CheckExistingPassword();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"ファイル選択時にエラーが発生しました: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// 既存パスワードの確認処理
+    /// </summary>
+    private async Task CheckExistingPassword()
+    {
+        if (selectedFile == null) return;
+
+        try
+        {
+            // 処理中状態に設定
+            isProcessing = true;
+            processingMessage = "PDFファイルを確認しています...";
+            StateHasChanged();
+
+            // ファイルをバイト配列として読み込み
+            using var stream = selectedFile.OpenReadStream(maxAllowedSize: MaxSizeByte);
+            var buffer = new byte[selectedFile.Size];
+            await stream.ReadAsync(buffer);
+
+            // 既存のPdfSharpCoreラップクラスを使用してパスワード確認
+            //PdfSecurityInfo pdfSecurityInfo = Utils.IsPasswordProtected(buffer,"");
+
+
+            // 既存パスワードチェック結果（実際の実装では上記のラップクラスの結果を使用）
+            // bool hasUserPassword = pdfSecurityInfo.isViewingPasswordProtected;
+            // bool hasOwnerPassword = pdfSecurityInfo.isPermissionPasswordProtected;
+
+            // 既存パスワードチェック結果（実際の実装では上記のラップクラスの結果を使用）
+            bool hasUserPassword = true; // 仮の実装
+            bool hasOwnerPassword = true; // 仮の実装
+            
+            
+            if (hasUserPassword || hasOwnerPassword)
+            {
+                // 既にパスワードが設定されている場合
+                errorMessage = "選択されたPDFファイルには既にパスワードが設定されています。パスワードが設定されていないPDFファイルを選択してください。";
+                showPasswordForm = false;
+            }
+            else
+            {
+                // パスワードが設定されていない場合、フォームを表示
+                showPasswordForm = true;
+                successMessage = "PDFファイルの確認が完了しました。パスワードを設定してください。";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"PDFファイルの確認中にエラーが発生しました: {ex.Message}";
+            showPasswordForm = false;
+        }
+        finally
+        {
+            // 処理中状態を解除
+            isProcessing = false;
+            processingMessage = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// パスワード設定とダウンロード処理
+    /// </summary>
+    private async Task SetPasswordAndDownload()
+    {
+        if (selectedFile == null || !CanSetPassword()) return;
+        
+        try
+        {
+            // 処理中状態に設定
+            isProcessing = true;
+            processingMessage = "パスワードを設定しています...";
+            ClearMessages();
+            StateHasChanged();
+            
+            // ファイルをバイト配列として読み込み
+            using var stream = selectedFile.OpenReadStream(maxAllowedSize: MaxSizeByte);
+            var buffer = new byte[selectedFile.Size];
+            await stream.ReadAsync(buffer);
+            
+            
+            try
+            {
+                //var encrptBuffer = PasswordSetter.SetPdfPassword(buffer, userPassword, ownerPassword);
+                var encrptBuffer = new byte[0]; // 仮の実装
+   
+                
+                // 実際の実装では上記で生成されたprotectedPdfを使用
+                var protectedPdf = encrptBuffer; // 仮の実装
+                
+                // ダウンロード用のファイル名を生成
+                var originalFileName = Path.GetFileNameWithoutExtension(selectedFile.Name);
+                var downloadFileName = $"{originalFileName}_protected.pdf";
+                
+                // ブラウザでファイルダウンロードを実行
+                await DownloadFile(protectedPdf, downloadFileName);
+                
+                // 成功メッセージを表示
+                successMessage = "パスワードの設定が完了し、ファイルがダウンロードされました。";
+                
+                // パスワードをクリア（セキュリティ対策）
+                ClearPasswords();
+                
+                // フォームを非表示にする
+                showPasswordForm = false;
+            }
+            catch (OperationCanceledException)
+            {
+                errorMessage = "処理時間が30秒を超えました。より小さなファイルを試してください。";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"パスワード設定処理中にエラーが発生しました: {ex.Message}";
+        }
+        finally
+        {
+            // 処理中状態を解除
+            isProcessing = false;
+            processingMessage = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// ファイルダウンロード処理
+    /// </summary>
+    /// <param name="fileBytes">ファイルのバイト配列</param>
+    /// <param name="fileName">ダウンロードファイル名</param>
+    private async Task DownloadFile(byte[] fileBytes, string fileName)
+    {
+        // JavaScriptを使用してファイルダウンロードを実行
+        await JSRuntime.InvokeVoidAsync("downloadFile", Convert.ToBase64String(fileBytes), fileName);
+    }
+
+    /// <summary>
+    /// パスワード設定可能かチェック
+    /// </summary>
+    /// <returns>設定可能な場合true</returns>
+    private bool CanSetPassword()
+    {
+        // 閲覧パスワードまたは編集パスワードのいずれかが入力されている場合に設定可能
+        return !string.IsNullOrWhiteSpace(userPassword) || !string.IsNullOrWhiteSpace(ownerPassword);
+    }
+
+    /// <summary>
+    /// ファイルサイズを読みやすい形式でフォーマット
+    /// </summary>
+    /// <param name="bytes">バイト数</param>
+    /// <returns>フォーマットされた文字列</returns>
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes < 1024)
+            return $"{bytes} B";
+        else if (bytes < 1024 * 1024)
+            return $"{bytes / 1024.0:F1} KB";
+        else
+            return $"{bytes / (1024.0 * 1024.0):F1} MB";
+    }
+
+    /// <summary>
+    /// メッセージをクリア
+    /// </summary>
+    private void ClearMessages()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+    }
+
+    /// <summary>
+    /// パスワードをクリア（セキュリティ対策）
+    /// </summary>
+    private void ClearPasswords()
+    {
+        userPassword = string.Empty;
+        ownerPassword = string.Empty;
+    }
+}
