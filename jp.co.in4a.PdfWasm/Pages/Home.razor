@@ -313,16 +313,6 @@
 
                 PdfPermissionsFlags permissions　= PdfPermissionsFlags.Default;
                 var encrptBuffer = PdfSecurityManager.ApplySecurity(buffer, userPassword, ownerPassword, permissions);
-                //var encrptBuffer = PasswordSetter.SetPdfPassword(buffer, userPassword, ownerPassword);
-                //var encrptBuffer = new byte[0]; // 仮の実装
-   
-                
-                // // 実際の実装では上記で生成されたprotectedPdfを使用
-                // var protectedPdf = encrptBuffer; // 仮の実装
-                
-                // // ダウンロード用のファイル名を生成
-                // var originalFileName = Path.GetFileNameWithoutExtension(selectedFile.Name);
-                // var downloadFileName = $"{originalFileName}_protected.pdf";
                 
                 // ブラウザでファイルダウンロードを実行
                 await DownloadFile(encrptBuffer, DateTime.Now.ToString("yyyyMMdd_HHmmss_") + selectedFile.Name);
